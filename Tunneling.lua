@@ -187,40 +187,55 @@ end
 function Homing()
 end
 
-write("What is my current x position? ")
-homeCord.x = read()
-if cooridateIsValid(homeCord.x) then
-    homeCord.x = tonumber(homeCord.x)
-    currentCord.x = homeCord.x
-else
-    print("Invalid input")
-    return
-end
-write("What is my current y position? ")
-homeCord.y = read()
-if cooridateIsValid(homeCord.y) then
-    homeCord.y = tonumber(homeCord.y)
-    currentCord.y = homeCord.y
-else
-    print("Invalid input")
-    return
-end
-write("What is my current z position? ")
-homeCord.z = read()
-if cooridateIsValid(homeCord.z) then
-    homeCord.z = tonumber(homeCord.z)
-    currentCord.z = homeCord.z
-else
-    print("Invalid input")
-    return
-end
-write("What direction am I facing? ")
-homeHeading = string.lower(read())
-if directionIsValid(homeHeading) ~= true then
-    print("Invalid input")
-    return
-end
-currentHeading = homeHeading
+local function locationSetup()
+    if gps.locate() == nil then
+        write("What is my current x position? ")
+        homeCord.x = read()
+        if cooridateIsValid(homeCord.x) then
+            homeCord.x = tonumber(homeCord.x)
+            currentCord.x = homeCord.x
+        else
+            print("Invalid input")
+            return
+        end
+        write("What is my current y position? ")
+        homeCord.y = read()
+        if cooridateIsValid(homeCord.y) then
+            homeCord.y = tonumber(homeCord.y)
+            currentCord.y = homeCord.y
+        else
+            print("Invalid input")
+            return
+        end
+        write("What is my current z position? ")
+        homeCord.z = read()
+        if cooridateIsValid(homeCord.z) then
+            homeCord.z = tonumber(homeCord.z)
+            currentCord.z = homeCord.z
+        else
+            print("Invalid input")
+            return
+        end
+    else
+        local x, y, z = gps.locate()
+        homeCord.x = x
+        homeCord.y = y
+        homeCord.z = z
+        currentCord.x = x
+        currentCord.y = y
+        currentCord.z = z
+    end
 
-while travel() == true do
+    write("What direction am I facing? ")
+    homeHeading = string.lower(read())
+    if directionIsValid(homeHeading) ~= true then
+        print("Invalid input")
+        return
+    end
+    currentHeading = homeHeading
 end
+
+locationSetup()
+
+--while travel() == true do
+--end
