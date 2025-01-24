@@ -5,6 +5,7 @@ local currentHeading = ""
 local homeCord = vector.new(0, 0, 0)
 local homeHeading = ""
 local currentCord = vector.new(0, 0, 0)
+
 -- Ores to mine
 local ores = {
     "minecraft:coal_ore",
@@ -30,9 +31,10 @@ local ores = {
     "thermal:deepslate_iron_ore",
     "thermal:deepslate_gold_ore",
 }
+local oreLocations = {}
 
 -- Validates the block data
-function CheckOre(block_data)
+local function CheckOre(block_data)
     if (block_data["name"] ~= nil) then
         for i, ore in ipairs(ores) do
             if (block_data["name"] == ore) then
@@ -42,6 +44,55 @@ function CheckOre(block_data)
         return false
     else
         return false
+    end
+end
+
+-- Gets the coordinates of the ores via the turtle
+local function getOreLocation(location)
+    if location == 1 then
+        return vector.new(currentCord.x, currentCord.y + 1, currentCord.z)
+    elseif location == 2 then
+        return vector.new(currentCord.x, currentCord.y - 1, currentCord.z)
+    elseif location == 3 then
+        if currentHeading == "north" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z + 1)
+        elseif currentHeading == "south" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z - 1)
+        elseif currentHeading == "east" then
+            return vector.new(currentCord.x + 1, currentCord.y, currentCord.z)
+        elseif currentHeading == "west" then
+            return vector.new(currentCord.x - 1, currentCord.y, currentCord.z)
+        end
+    elseif location == 4 then
+        if currentHeading == "north" then
+            return vector.new(currentCord.x - 1, currentCord.y, currentCord.z)
+        elseif currentHeading == "south" then
+            return vector.new(currentCord.x + 1, currentCord.y, currentCord.z)
+        elseif currentHeading == "east" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z - 1)
+        elseif currentHeading == "west" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z + 1)
+        end
+    elseif location == 5 then
+        if currentHeading == "north" then
+            return vector.new(currentCord.x + 1, currentCord.y, currentCord.z)
+        elseif currentHeading == "south" then
+            return vector.new(currentCord.x - 1, currentCord.y, currentCord.z)
+        elseif currentHeading == "east" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z + 1)
+        elseif currentHeading == "west" then
+            return vector.new(currentCord.x, currentCord.y, currentCord.z - 1)
+        end
+    end
+end
+
+-- Adds the ore location to the oreLocations table
+local function addOreLocation(checkedLocations)
+    for i, location in ipairs(checkedLocations) do
+        if location == true then
+            for i, oreLocations in ipairs(oreLocations) do
+            end
+        end
     end
 end
 
@@ -173,7 +224,7 @@ local function travel()
             print("Traveled to " .. currentCord.y)
             return true
         else
-            -- To be changed
+            -- TODO: Add Tunneling routine
             print("Reached Mining Depth")
             return false
         end
@@ -185,6 +236,7 @@ end
 
 -- Brings the turtle to the home position
 function Homing()
+    -- TODO: Add homing routine
 end
 
 local function locationSetup()
