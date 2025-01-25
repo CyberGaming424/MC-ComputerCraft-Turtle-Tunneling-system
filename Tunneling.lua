@@ -31,6 +31,8 @@ local ores = {
     "thermal:deepslate_iron_ore",
     "thermal:deepslate_gold_ore",
 }
+
+-- Location of ores discoverd by the turtle
 local oreLocations = {}
 
 -- Validates the block data
@@ -88,9 +90,19 @@ end
 
 -- Adds the ore location to the oreLocations table
 local function addOreLocation(checkedLocations)
+    local isNewOre = false
     for i, location in ipairs(checkedLocations) do
         if location == true then
-            for i, oreLocations in ipairs(oreLocations) do
+            oreVector = getOreLocation(i)
+            for i, oreLocation in ipairs(oreLocations) do
+                if oreLocation == oreVector then
+                    isNewOre = false
+                else
+                    isNewOre = true
+                end
+            end
+            if isNewOre == true then
+                table.insert(oreLocations, oreVector)
             end
         end
     end
@@ -162,38 +174,59 @@ local function updateHeading(rotation)
     end
 end
 
-local function updatePosition()
-    if currentHeading == "north" then
-        currentCord.z = currentCord.z - 1
-    elseif currentHeading == "east" then
-        currentCord.x = currentCord.x + 1
-    elseif currentHeading == "south" then
-        currentCord.z = currentCord.z + 1
-    elseif currentHeading == "west" then
-        currentCord.x = currentCord.x - 1
+local function updateHeading(rotation)
+    local directions = { "north", "east", "south", "west" }
+    local index = 0
+
+    -- Find current direction's index
+    for i, direction in ipairs(directions) do
+        if currentHeading == direction then
+            index = i
+            break
+        end
+    end
+
+    if rotation == "left" then
+        index = (index - 2) % 4 + 1
+    elseif rotation == "right" then
+        index = index % 4 + 1
+    end
+
+    currentHeading = directions[index]
+end
+
+local function removedMinedOres()
+    for i, oreLocation in ipairs(oreLocations) do
+        if oreLocation == currentCord then
+            table.remove(oreLocations, i)
+        end
     end
 end
 
 -- Recursively mines the ores
 local function recursiveOreMine()
     local surrounding = checkSurrounding()
+    addOreLocation(surrounding)
     if surrounding[1] == true then
         turtle.digUp()
         turtle.up()
         currentCord.y = currentCord.y + 1
         distanceTraveled = distanceTraveled + 1
+        removedMinedOres()
         recursiveOreMine()
     elseif surrounding[2] == true then
         turtle.digDown()
         turtle.down()
         distanceTraveled = distanceTraveled + 1
         currentCord.y = currentCord.y - 1
+        removedMinedOres()
         recursiveOreMine()
     elseif surrounding[3] == true then
         turtle.dig()
         turtle.forward()
         updatePosition()
         distanceTraveled = distanceTraveled + 1
+        removedMinedOres()
         recursiveOreMine()
     elseif surrounding[4] == true then
         turtle.turnLeft()
@@ -202,6 +235,7 @@ local function recursiveOreMine()
         turtle.forward()
         updatePosition()
         distanceTraveled = distanceTraveled + 1
+        removedMinedOres()
         recursiveOreMine()
     elseif surrounding[5] == true then
         turtle.turnRight()
@@ -210,7 +244,149 @@ local function recursiveOreMine()
         turtle.forward()
         updatePosition()
         distanceTraveled = distanceTraveled + 1
+        removedMinedOres()
         recursiveOreMine()
+    end
+end
+
+local function heuristic(pos, goal)
+    -- Simple Manhattan distance for the grid
+    return math.abs(pos.x - goal.x) + math.abs(pos.y - goal.y) + math.abs(pos.z - goal.z)
+end
+
+local function pathfinding(goalCord)
+    local openSet = {}
+    local closedSet = {}
+    local cameFrom = {}
+
+    local function isVectorEqual(a, b)
+        return a.x == b.x and a.y == b.y and a.z == b.z
+    end
+
+    local startNode = { position = currentCord, g = 0, h = heuristic(currentCord, goalCord) }
+    startNode.f = startNode.g + startNode.h
+    table.insert(openSet, startNode)
+
+    while #openSet > 0 do
+        -- Sort openSet to get the node with the lowest f score (A*-like)
+        table.sort(openSet, function(a, b) return a.f < b.f end)
+        local currentNode = table.remove(openSet, 1)
+
+        if isVectorEqual(currentNode.position, goalCord) then
+            -- Reconstruct path
+            local path = {}
+            while currentNode do
+                table.insert(path, 1, currentNode.position)
+                currentNode = cameFrom[currentNode]
+            end
+            return path
+        end
+
+        table.insert(closedSet, currentNode.position)
+
+        local neighbors = {
+            vector.new(currentNode.position.x + 1, currentNode.position.y, currentNode.position.z),
+            vector.new(currentNode.position.x - 1, currentNode.position.y, currentNode.position.z),
+            vector.new(currentNode.position.x, currentNode.position.y + 1, currentNode.position.z),
+            vector.new(currentNode.position.x, currentNode.position.y - 1, currentNode.position.z),
+            vector.new(currentNode.position.x, currentNode.position.y, currentNode.position.z + 1),
+            vector.new(currentNode.position.x, currentNode.position.y, currentNode.position.z - 1),
+        }
+
+        for _, neighbor in ipairs(neighbors) do
+            -- Skip invalid positions and positions already in closedSet
+            if not containsVector(closedSet, neighbor) and isPositionValid(neighbor) then
+                local tentative_g = currentNode.g + 1
+
+                local neighborNode = {
+                    position = neighbor,
+                    g = tentative_g,
+                    h = heuristic(neighbor, goalCord),
+                }
+                neighborNode.f = neighborNode.g + neighborNode.h
+
+                -- Check if neighbor is already in openSet with a lower f score
+                local inOpenSet = false
+                for _, openNode in ipairs(openSet) do
+                    if isVectorEqual(openNode.position, neighbor) and tentative_g >= openNode.g then
+                        inOpenSet = true
+                        break
+                    end
+                end
+
+                if not inOpenSet then
+                    table.insert(openSet, neighborNode)
+                    cameFrom[neighborNode] = currentNode
+                end
+            end
+        end
+    end
+    return nil -- No path found
+end
+
+-- Helper function to check if a vector is in a table
+function containsVector(tbl, vec)
+    for _, v in ipairs(tbl) do
+        if vec.x == v.x and vec.y == v.y and vec.z == v.z then
+            return true
+        end
+    end
+    return false
+end
+
+-- Placeholder function to determine if a given position is valid
+function isPositionValid(pos)
+    -- Check boundaries and other conditions
+    -- For now, assume all positions are valid for simplicity
+    return true
+end
+
+-- Commands the turtle to rotate to a specific heading
+local function rotateToHeading(targetHeading)
+    while currentHeading ~= targetHeading do
+        turtle.turnRight()
+        updateHeading("right")
+    end
+end
+
+-- Moves the turtle to a specific coordinate using the path
+local function navigatePath(path)
+    for i = 2, #path do
+        local previous = path[i - 1]
+        local current = path[i]
+
+        if current.x > previous.x then
+            rotateToHeading("east")
+        elseif current.x < previous.x then
+            rotateToHeading("west")
+        elseif current.z > previous.z then
+            rotateToHeading("south")
+        elseif current.z < previous.z then
+            rotateToHeading("north")
+        end
+
+        if current.y > previous.y then
+            turtle.up()
+        elseif current.y < previous.y then
+            turtle.down()
+        else
+            turtle.forward()
+        end
+
+        currentCord = vector.new(current.x, current.y, current.z)
+    end
+end
+
+-- Finishes mining any of the ores that were missed
+function clearMissedOres()
+    for _, oreLocation in ipairs(oreLocations) do
+        local path = pathfinding(oreLocation)
+        if path then
+            navigatePath(path)
+            -- Assume this then initiates mining at the target location
+            turtle.dig()
+            removedMinedOres()
+        end
     end
 end
 
@@ -224,8 +400,12 @@ local function travel()
             print("Traveled to " .. currentCord.y)
             return true
         else
-            -- TODO: Add Tunneling routine
-            print("Reached Mining Depth")
+            recursiveOreMine()
+            clearMissedOres()
+            turtle.dig()
+            turtle.forward()
+            updatePosition()
+            distanceTraveled = distanceTraveled + 1
             return false
         end
     else
@@ -288,6 +468,10 @@ local function locationSetup()
 end
 
 locationSetup()
+
+-- Test of pathfinding
+local path = pathfinding(vector.new(-79, 62, -46))
+navigatePath(path)
 
 --while travel() == true do
 --end
